@@ -15,39 +15,31 @@ from bson import ObjectId
 from Cryptodome.Cipher import AES
 from Cryptodome import Random
 from pymongo.server_api import ServerApi
-import pandas as pd
 import configparser
 
 
 class App:
     def __init__(self, root):
-        root_dir = os.path.dirname(os.path.realpath(__file__))  # 获取项目主路径
-        configpath = os.path.join(root_dir, "configfile.ini")  # 拼接路径
-        self.cf = configparser.RawConfigParser()
-        self.cf.read(configpath, encoding='utf-8')
-        uri = self.cf.get("mongodb", 'uri')
-
-        self.client = pymongo.MongoClient(uri, server_api=ServerApi('1'))
-        self.db = self.client['files']
-        self.fs_rar = gridfs.GridFS(self.db, 'rar')
-        self.coll = self.db["rar.files"]
-
-        pd.set_option('display.max_rows', 500)
-        pd.set_option('display.max_columns', 200)  # pd.set_option('display.max_columns', None)
-        pd.set_option('display.width', 1000)
-
         self.iv = Random.new().read(AES.block_size)
         self.key = Random.new().read(AES.block_size)
         title = ''
-
+        configpath = 'configfile.ini'
+        state = 'disabled'
+        self.rewrite = 0
         try:
+            cf = configparser.RawConfigParser()
+            cf.read(configpath, encoding='utf-8')
+            uri = cf.get('mongodb', 'uri')
+            self.rewrite = cf.get('rewrite', 'rewrite')
+            self.client = pymongo.MongoClient(uri, server_api=ServerApi('1'))
+            self.db = self.client['files']
+            self.fs_rar = gridfs.GridFS(self.db, 'rar')
+            self.coll = self.db['rar.files']
             dblist = self.client.list_database_names()
             if dblist:
-                # root.write_log_to_Text('数据库连接成功')
                 title = '数据库连接成功'
-                # print(dblist)
+                state = 'active'
         except:
-            # root.write_log_to_Text('数据库连接失败')
             title = '数据库连接失败'
 
         # setting title
@@ -62,7 +54,6 @@ class App:
         root.geometry(alignstr)
         root.resizable(width=False, height=False)
 
-        # 初始化Entry控件的textvariable属性值.
         self.select_path = tk.StringVar()
         GLineEdit_path = tk.Entry(root, textvariable=self.select_path)
         GLineEdit_path["borderwidth"] = "1px"
@@ -73,7 +64,7 @@ class App:
         GLineEdit_path["relief"] = "flat"
         GLineEdit_path.place(x=70, y=10, width=221, height=30)
 
-        GButton_upload = tk.Button(root)
+        GButton_upload = tk.Button(root, state=state)
         GButton_upload["bg"] = "#efefef"
         ft = tkFont.Font(family='Times', size=10)
         GButton_upload["font"] = ft
@@ -93,9 +84,8 @@ class App:
         # GLineEdit_916["relief"] = "flat"
         # GLineEdit_916.place(x=10,y=130,width=383,height=152)
 
-        title = ('name', 'length','id' )
+        title = ('name', 'length', 'id')
         self.tv = ttk.Treeview(root, columns=title, show='headings', height=8)
-        # self.tv.pack()
         for i in range(len(title)):
             self.tv.column(title[i], width=10, anchor='e')
             self.tv.heading(title[i], text=title[i])
@@ -103,16 +93,7 @@ class App:
         self.tv.place(x=10, y=130, width=383, height=152)
         self.tv.bind("<ButtonRelease - 1>", self.selectItem)
 
-        # def popup(event):
-        #     "鼠标事件"
-        #     item = self.tv.selection()[0]
-        #     print( ", it's values = ", self.tv.item(item, "values"))
-        #     print('___________________')
-        #
-        # # self.tv.bind("<Button-1>", popup)
-        # self.tv.bind("<ButtonRelease - 1>", popup)
-
-        GButton_download = tk.Button(root)
+        GButton_download = tk.Button(root, state=state)
         GButton_download["bg"] = "#efefef"
         ft = tkFont.Font(family='Times', size=10)
         GButton_download["font"] = ft
@@ -123,7 +104,6 @@ class App:
         GButton_download.place(x=300, y=50, width=94, height=30)
         GButton_download["command"] = self.GButton_download_command
 
-        # 初始化Entry控件的textvariable属性值
         self.text_status = tk.StringVar()
         self.GLineEdit_778 = tk.Entry(root, textvariable=self.text_status)  # 状态
         self.GLineEdit_778["borderwidth"] = "1px"
@@ -156,7 +136,7 @@ class App:
         GCheckBox_rar.place(x=20, y=90, width=53, height=30)
         GCheckBox_rar["offvalue"] = "0"
         GCheckBox_rar["onvalue"] = "1"
-        GCheckBox_rar["command"] = self.GCheckBox_rar_command
+
 
         self.valtxt = IntVar()
         GCheckBox_txt = tk.Checkbutton(root, variable=self.valtxt)
@@ -169,7 +149,7 @@ class App:
         GCheckBox_txt.place(x=100, y=90, width=51, height=30)
         GCheckBox_txt["offvalue"] = "0"
         GCheckBox_txt["onvalue"] = "1"
-        GCheckBox_txt["command"] = self.GCheckBox_txt_command
+
 
         self.valexe = IntVar()
         GCheckBox_exe = tk.Checkbutton(root, variable=self.valexe)
@@ -182,7 +162,7 @@ class App:
         GCheckBox_exe.place(x=170, y=90, width=64, height=30)
         GCheckBox_exe["offvalue"] = "0"
         GCheckBox_exe["onvalue"] = "1"
-        GCheckBox_exe["command"] = self.GCheckBox_exe_command
+
 
         self.valother = IntVar()
         GCheckBox_other = tk.Checkbutton(root, variable=self.valother)
@@ -195,9 +175,9 @@ class App:
         GCheckBox_other.place(x=240, y=90, width=56, height=30)
         GCheckBox_other["offvalue"] = "0"
         GCheckBox_other["onvalue"] = "1"
-        GCheckBox_other["command"] = self.GCheckBox_other_command
 
-        GButton_delete = tk.Button(root)
+
+        GButton_delete = tk.Button(root, state=state)
         GButton_delete["bg"] = "#efefef"
         ft = tkFont.Font(family='Times', size=10)
         GButton_delete["font"] = ft
@@ -208,7 +188,7 @@ class App:
         GButton_delete.place(x=300, y=90, width=91, height=30)
         GButton_delete["command"] = self.GButton_delete_command
 
-        GButton_90 = tk.Button(root)
+        GButton_90 = tk.Button(root, state=state)
         GButton_90["bg"] = "#efefef"
         ft = tkFont.Font(family='Times', size=10)
         GButton_90["font"] = ft
@@ -219,7 +199,7 @@ class App:
         GButton_90.place(x=0, y=10, width=66, height=30)
         GButton_90["command"] = self.GButton_90_command
 
-        GButton_search = tk.Button(root)
+        GButton_search = tk.Button(root, state=state)
         GButton_search["bg"] = "#efefef"
         ft = tkFont.Font(family='Times', size=10)
         GButton_search["font"] = ft
@@ -232,14 +212,12 @@ class App:
 
     def GButton_upload_command(self):
         self.text_status.set('上传')
-        # self.select_path.set('D:/workspace/2.rar')
         if self.select_path.get():
             path = self.select_path.get()
             fileName = os.path.split(path)[1]
-            print(fileName)
             self.text_status.set(fileName)
             id = self.findFileByName(fileName)
-            rewrite = 1
+            rewrite = self.rewrite  # 控制是否允许同名继续上传  1允许
             if id and rewrite == 0:
                 self.text_status.set('%s文件存在，停止上传：%s' % (fileName, id))
                 self.text_search.set(fileName)
@@ -254,23 +232,15 @@ class App:
             self.text_status.set('未选择上传文件')
 
     def GButton_download_command(self):
-        # print("command247")
-        # self.text_status.set('文件保存成功：627d28720dc2723480ee1e7a')
-        print(os.getcwd())
         downloadID = self.text_status.get()
-        # print(downloadID)
         if downloadID and len(downloadID.split('：')) > 1:
             id = downloadID.split('：')[1]
-            print(len(id))
             if len(id) == 24:
                 fileName = self.findFileByID(id)
-                # print(fileName)
                 if fileName:
                     sp = fileName.split('.')
                     fileName = sp[0] + '_db.' + sp[1]
-                    # print(fileName)
                     self.write_to_disk(fileName, self.get_file_from_mongo(id))
-
                     self.text_status.set('%s写入硬盘%s\\' % (fileName, os.getcwd()))
                 else:
                     self.text_status.set('未发现id为%s的文件' % id)
@@ -279,43 +249,17 @@ class App:
         else:
             self.text_status.set('_id为空')
 
-        # 文件保存成功：627d227c499b77d0150a0c15
-
-    def GCheckBox_rar_command(self):
-        print("command304")
-        self.text_status.set('command304')
-
-    def GCheckBox_txt_command(self):
-        print("command125")
-        self.text_status.set('command125')
-
-    def GCheckBox_exe_command(self):
-        print("command45")
-        self.text_status.set('command45')
-
-    def GCheckBox_other_command(self):
-        print("command214")
-        print(self.valother.get())
-        self.text_status.set('command214')
-
     def GButton_delete_command(self):
-        print("command730")
-        # self.text_status.set('command730')
         id = self.text_status.get()
         if id and len(id.split('：')) > 1:
             id = id.split('：')[1]
         if id and len(id) == 24:
             b = msgbox.askokcancel('确认操作', '真的要删除编号为%s的文件么？' % id)  # 返回值true/false
-            # print(b)
             if b:
-                # id = self.text_status.get()
-                print(id)
                 re = self.fs_rar.delete(ObjectId(id))
                 self.GButton_search_command()
-                # print(re)
 
     def GButton_90_command(self):
-        print("command90")
         # 单个文件选择
         selected_file_path = filedialog.askopenfilename()  # 使用askopenfilename函数选择单个文件
         self.select_path.set(selected_file_path)
@@ -323,11 +267,10 @@ class App:
     def getArgs(self):
         args = {}
         fileName = self.text_search.get()
-        print('___________getargs_____________')
-
-        if fileName:  # {"$and":[{'filename': {'$regex': 'ra'}},{"$not":[{"type":"rar"},{"type":"mp3"}]}]}
+        if fileName:
             if self.valother.get() == 1:
-                args = {'$and': [{'filename': {'$regex': fileName}}, {'$nor': [{'type': 'rar'}, {'type': 'exe'}, {'type': 'txt'}]}]}
+                args = {'$and': [{'filename': {'$regex': fileName}},
+                                 {'$nor': [{'type': 'rar'}, {'type': 'exe'}, {'type': 'txt'}]}]}
             else:
                 list = []
                 type = ''
@@ -343,32 +286,22 @@ class App:
                 if self.valrar.get() + self.valexe.get() + self.valtxt.get() > 1:
                     args = {'$and': [{'filename': {'$regex': fileName}}, {'$or': list}]}
                 elif self.valrar.get() + self.valexe.get() + self.valtxt.get() == 1:
-                    args={'$and': [{'filename': {'$regex': fileName}}, {'type': type}]}
+                    args = {'$and': [{'filename': {'$regex': fileName}}, {'type': type}]}
                 else:
                     args['filename'] = {'$regex': fileName}
-
-
         return args
 
     def GButton_search_command(self):  # 搜索
-        print('command209')
         args = self.getArgs()
-        print('__________args______________')
-        print(args)
         result = self.coll.find(args).limit(10)
-        print(result)
-        # df = pd.DataFrame(list(result))
-        # print(df)
         for row in self.tv.get_children():
             self.tv.delete(row)
         for row in result:
-            self.tv.insert('', 'end', values=( row['filename'], row['length'],row['_id']))
+            self.tv.insert('', 'end', values=(row['filename'], row['length'], row['_id']))
 
     def selectItem(self, event):
         curItem = self.tv.focus()
-        # print (self.tv.item(curItem))
         list1 = self.tv.item(curItem)['values']
-        # print(list1)
         if list1 and len(list1) > 2:
             self.text_status.set('%s大小%s ID为：%s' % (list1[0], list1[1], list1[2]))
 
@@ -378,28 +311,25 @@ class App:
             return back['_id']
         else:
             return back
-        # 存储文件到mongo
 
     def findFileByID(self, id):
         back = self.coll.find_one({"_id": ObjectId(id)})
-        # print(back)
         if back:
             return back['filename']
         else:
             return back
 
+    # 存储文件到mongo
     def save_file_to_mongo(self, path, keyword, rewrite=0):
-
         fileName = os.path.split(path)[1]
         id = self.findFileByName(fileName)
         if id and rewrite == 0:
-            print('文件存在，直接返回id')
+            # print('文件存在，直接返回id')
             return id
         else:
             args = {}
             args['keyword'] = keyword
             args['type'] = fileName.split('.')[1]
-            # args['key'] = self.key
             with open(path, 'rb') as f:
                 data = f.read()
             data = self.encrypt(data)
@@ -428,5 +358,4 @@ class App:
 if __name__ == "__main__":
     root = tk.Tk()
     app = App(root)
-    print('asdfas')
     root.mainloop()
