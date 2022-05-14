@@ -26,21 +26,37 @@ class App:
         configpath = 'configfile.ini'
         state = 'disabled'
         self.rewrite = 0
+        self.rar = 'rar'
+        self.txt = 'txt'
+        self.exe = 'exe'
+        self.fsname = 'rar'
+        self.dbname = 'files'
+        self.collectionname = self.fsname+'.files'
         try:
             cf = configparser.RawConfigParser()
             cf.read(configpath, encoding='utf-8')
             uri = cf.get('mongodb', 'uri')
             self.rewrite = cf.get('rewrite', 'rewrite')
+            self.fsname = cf.get('mongodb', 'fs')
+            self.dbname = cf.get('mongodb', 'db')
+            self.collectionname = self.fsname + '.files'
             self.client = pymongo.MongoClient(uri, server_api=ServerApi('1'))
-            self.db = self.client['files']
-            self.fs_rar = gridfs.GridFS(self.db, 'rar')
-            self.coll = self.db['rar.files']
+            self.db = self.client[self.dbname]
+            self.fs_rar = gridfs.GridFS(self.db, self.fsname)
+            self.coll = self.db[self.collectionname]
             dblist = self.client.list_database_names()
             if dblist:
                 title = '数据库连接成功'
                 state = 'active'
+            self.rar = cf.get('filter', 'rar')
+            self.txt = cf.get('filter', 'txt')
+            self.exe = cf.get('filter', 'exe')
         except:
-            title = '数据库连接失败'
+            print('except')
+            if title == '数据库连接成功':
+                title = '数据库连接成功,过滤配置出错'
+            else:
+                title = '数据库连接失败'
 
         # setting title
         # root.title("file2mongodb")
@@ -84,12 +100,12 @@ class App:
         # GLineEdit_916["relief"] = "flat"
         # GLineEdit_916.place(x=10,y=130,width=383,height=152)
 
-        title = ('name', 'length', 'id')
+        title = ('name', 'len(KB)','upDate', 'id')
         self.tv = ttk.Treeview(root, columns=title, show='headings', height=8)
         for i in range(len(title)):
-            self.tv.column(title[i], width=10, anchor='e')
+            self.tv.column(title[i], width=100, anchor='e')
             self.tv.heading(title[i], text=title[i])
-        self.tv.column(0, width=100)
+        self.tv.column(1, width=20)
         self.tv.place(x=10, y=130, width=383, height=152)
         self.tv.bind("<ButtonRelease - 1>", self.selectItem)
 
@@ -131,7 +147,7 @@ class App:
         GCheckBox_rar["font"] = ft
         GCheckBox_rar["fg"] = "#333333"
         GCheckBox_rar["justify"] = "center"
-        GCheckBox_rar["text"] = "RAR"
+        GCheckBox_rar["text"] = self.rar
         GCheckBox_rar["relief"] = "flat"
         GCheckBox_rar.place(x=20, y=90, width=53, height=30)
         GCheckBox_rar["offvalue"] = "0"
@@ -144,7 +160,7 @@ class App:
         GCheckBox_txt["font"] = ft
         GCheckBox_txt["fg"] = "#333333"
         GCheckBox_txt["justify"] = "center"
-        GCheckBox_txt["text"] = "TXT"
+        GCheckBox_txt["text"] = self.txt
         GCheckBox_txt["relief"] = "flat"
         GCheckBox_txt.place(x=100, y=90, width=51, height=30)
         GCheckBox_txt["offvalue"] = "0"
@@ -157,24 +173,24 @@ class App:
         GCheckBox_exe["font"] = ft
         GCheckBox_exe["fg"] = "#333333"
         GCheckBox_exe["justify"] = "center"
-        GCheckBox_exe["text"] = "Exe"
+        GCheckBox_exe["text"] = self.exe
         GCheckBox_exe["relief"] = "flat"
         GCheckBox_exe.place(x=170, y=90, width=64, height=30)
         GCheckBox_exe["offvalue"] = "0"
         GCheckBox_exe["onvalue"] = "1"
 
 
-        self.valother = IntVar()
-        GCheckBox_other = tk.Checkbutton(root, variable=self.valother)
+        self.valexcept = IntVar()
+        GCheckBox_except = tk.Checkbutton(root, variable=self.valexcept)
         ft = tkFont.Font(family='Times', size=10)
-        GCheckBox_other["font"] = ft
-        GCheckBox_other["fg"] = "#333333"
-        GCheckBox_other["justify"] = "center"
-        GCheckBox_other["text"] = "Other"
-        GCheckBox_other["relief"] = "flat"
-        GCheckBox_other.place(x=240, y=90, width=56, height=30)
-        GCheckBox_other["offvalue"] = "0"
-        GCheckBox_other["onvalue"] = "1"
+        GCheckBox_except["font"] = ft
+        GCheckBox_except["fg"] = "#333333"
+        GCheckBox_except["justify"] = "center"
+        GCheckBox_except["text"] = "except"
+        GCheckBox_except["relief"] = "flat"
+        GCheckBox_except.place(x=240, y=90, width=56, height=30)
+        GCheckBox_except["offvalue"] = "0"
+        GCheckBox_except["onvalue"] = "1"
 
 
         GButton_delete = tk.Button(root, state=state)
@@ -268,42 +284,64 @@ class App:
         args = {}
         fileName = self.text_search.get()
         if fileName:
-            if self.valother.get() == 1:
+            if self.valexcept.get() == 1:
                 args = {'$and': [{'filename': {'$regex': fileName}},
-                                 {'$nor': [{'type': 'rar'}, {'type': 'exe'}, {'type': 'txt'}]}]}
+                                 {'$nor': [{'type': self.rar}, {'type': self.exe}, {'type': self.txt}]}]}
             else:
                 list = []
                 type = ''
                 if self.valrar.get() == 1:
-                    list.append({'type': 'rar'})
-                    type = 'rar'
+                    list.append({'type': self.rar})
+                    type = self.rar
                 if self.valexe.get() == 1:
-                    list.append({'type': 'exe'})
-                    type = 'exe'
+                    list.append({'type': self.exe})
+                    type = self.exe
                 if self.valtxt.get() == 1:
-                    list.append({'type': 'txt'})
-                    type = 'txt'
+                    list.append({'type': self.txt})
+                    type = self.txt
                 if self.valrar.get() + self.valexe.get() + self.valtxt.get() > 1:
                     args = {'$and': [{'filename': {'$regex': fileName}}, {'$or': list}]}
                 elif self.valrar.get() + self.valexe.get() + self.valtxt.get() == 1:
                     args = {'$and': [{'filename': {'$regex': fileName}}, {'type': type}]}
                 else:
                     args['filename'] = {'$regex': fileName}
+        else:
+            if self.valexcept.get() == 1:
+                args = {'$nor': [{'type': self.rar}, {'type': self.exe}, {'type': self.txt}]}
+            else:
+                list = []
+                type = ''
+                if self.valrar.get() == 1:
+                    list.append({'type': self.rar})
+                    type = self.rar
+                if self.valexe.get() == 1:
+                    list.append({'type': self.exe})
+                    type = self.exe
+                if self.valtxt.get() == 1:
+                    list.append({'type': self.txt})
+                    type = self.txt
+                if self.valrar.get() + self.valexe.get() + self.valtxt.get() > 1:
+                    args =  {'$or': list}
+                elif self.valrar.get() + self.valexe.get() + self.valtxt.get() == 1:
+                    args =  {'type': type}
+
+
         return args
 
     def GButton_search_command(self):  # 搜索
         args = self.getArgs()
+        print(args)
         result = self.coll.find(args).limit(10)
         for row in self.tv.get_children():
             self.tv.delete(row)
         for row in result:
-            self.tv.insert('', 'end', values=(row['filename'], row['length'], row['_id']))
+            self.tv.insert('', 'end', values=(row['filename'], row['length']//1000, row['uploadDate'], row['_id']))
 
     def selectItem(self, event):
         curItem = self.tv.focus()
         list1 = self.tv.item(curItem)['values']
         if list1 and len(list1) > 2:
-            self.text_status.set('%s大小%s ID为：%s' % (list1[0], list1[1], list1[2]))
+            self.text_status.set('%s大小%s ID为：%s' % (list1[0], list1[1], list1[3]))
 
     def findFileByName(self, fileName):
         back = self.coll.find_one({"filename": fileName})
@@ -351,7 +389,7 @@ class App:
 
     # 将文件写入硬盘
     def write_to_disk(self, fileName, content):
-        with open(fileName, 'wb') as f:
+        with open(fileName, 'wb' ) as f:
             f.write(content)
 
 
