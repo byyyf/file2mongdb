@@ -384,7 +384,7 @@ class App:
         ciptext = gf.read()
         key = ciptext[-16:]
         mydecrypt = AES.new(key, AES.MODE_CFB, ciptext[:16])
-        decrytext = mydecrypt.decrypt(ciptext[16:])
+        decrytext = mydecrypt.decrypt(ciptext[16:-16])
         return decrytext
 
     # 将文件写入硬盘
